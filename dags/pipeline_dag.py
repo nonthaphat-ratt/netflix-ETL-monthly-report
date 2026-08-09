@@ -1,9 +1,18 @@
+"""
+pipeline_dag.py
+
+หน้าที่: ไฟล์ DAG หลักของโปรเจค netflix ETL — บอก Airflow ว่า pipeline นี้
+         ต้องรันถี่แค่ไหน เริ่มนับจากวันไหน และมี task อะไรบ้าง
+
+Pipeline เต็มรูปแบบ: extract -> transform -> load
+
+เวอร์ชันนี้เขียนด้วย TaskFlow API (@dag, @task) แทน DAG()/PythonOperator แบบเดิม
+ทำงานเหมือนกันทุกประการ แค่เขียนสั้นและอ่านง่ายกว่า (Airflow แนะนำให้ใช้แบบนี้ในปัจจุบัน)
+"""
+
 import sys
 from pathlib import Path
 from datetime import datetime
-
-from airflow import DAG
-from airflow.operators.python import PythonOperator
 
 # ---------------------------------------------------------------------------
 # เพิ่ม root ของโปรเจคเข้าไปใน sys.path
@@ -13,48 +22,68 @@ from airflow.operators.python import PythonOperator
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-# import ฟังก์ชันที่เขียนไว้แล้วใน scripts/extract_csv.py
+# import ตัวช่วยสร้าง DAG แบบ TaskFlow API
+# @dag  -> ใช้แทนการเขียน DAG(...) แบบเดิม ห่อรอบฟังก์ชันที่รวม task ทั้งหมดไว้ข้างใน
+# @task -> ใช้แทน PythonOperator แบบเดิม ห่อรอบฟังก์ชัน Python ธรรมดาให้กลายเป็น task
+from airflow.sdk import dag, task
+
+# import ฟังก์ชันทั้ง 3 ตัว ที่เขียนไว้แล้วในโฟลเดอร์ scripts/
+# (ชื่อไฟล์ในนี้อ้างอิงตามชื่อไฟล์จริงในโปรเจค: extract_csv.py, transform_cleaned.py, load_to_DuckDB.py)
 from scripts.extract_csv import extract_monthly_data
+from scripts.transform_cleaned import transform_monthly_data
+from scripts.load_to_DuckDB import load_monthly_data
 
 
 # ---------------------------------------------------------------------------
-# ประกาศ DAG object — เป็น "ภาชนะ" ที่ครอบทุก task ไว้ข้างใน
+# @dag ครอบฟังก์ชันนี้ไว้ -> ตัวฟังก์ชัน netflix_monthly_etl() คือ "แผนผัง" ของ DAG ทั้งก้อน
+# พารามิเตอร์ในวงเล็บของ @dag คือค่าตั้งค่าเดียวกับที่เคยใส่ใน DAG(...) แบบเดิมทุกประการ
 # ---------------------------------------------------------------------------
-with DAG(
+@dag(
     dag_id="netflixcsv_monthly_etl",
 
     # จุดเริ่มนับตาราง ตั้งตามวันที่ข้อมูลจริงเริ่มมี (เจอจากตอนทำ EDA)
     start_date=datetime(2008, 1, 1),
 
     # ความถี่ในการรัน: รายเดือน
-    # หมายเหตุ: ถ้า Airflow เวอร์ชันเก่ากว่า 2.4 ต้องใช้ชื่อพารามิเตอร์ schedule_interval แทน
     schedule="@monthly",
 
-    # ปิดการรันย้อนหลังไว้ก่อนตอนพัฒนา/ทดสอบ (ตามที่ตกลงกันไว้)
+    # ปิดการรันย้อนหลังไว้ก่อนตอนพัฒนา/ทดสอบ
     # พอมั่นใจว่า pipeline ทำงานถูกต้องแล้ว ค่อยเปลี่ยนเป็น True เพื่อ backfill ย้อนหลังทีหลัง
     catchup=False,
 
-    description="ดึงข้อมูล Netflix titles รายเดือน จำลองจากไฟล์ CSV แบบ static",
+    description="ดึง-แปลง-โหลดข้อมูล Netflix titles รายเดือน จำลองจากไฟล์ CSV แบบ static",
     tags=["netflix", "etl"],
-) as dag:
+)
+def netflix_monthly_etl():
+    """แผนผัง DAG: extract -> transform -> load ตามลำดับ"""
 
     # -----------------------------------------------------------------------
-    # Task: extract_monthly_data
-    #
-    # PythonOperator จะเป็นตัวกลางเรียกฟังก์ชัน extract_monthly_data ให้เรา
-    # โดย Airflow จะดูชื่อพารามิเตอร์ในฟังก์ชัน แล้วจับคู่กับ context ของรอบนั้นให้เอง
-    # ในที่นี้ฟังก์ชันมีพารามิเตอร์ชื่อ "logical_date" ตรงกับ context พอดี
-    # Airflow จึงส่งค่าที่ถูกต้องของรอบนั้นเข้ามาให้อัตโนมัติ ไม่ต้องเขียนอะไรเพิ่ม
-    #
-    # ส่วน raw_csv_path และ output_dir ไม่ใช่ชื่อที่ Airflow รู้จัก
-    # จึงใช้ค่า default ที่กำหนดไว้แล้วในไฟล์ extract_csv.py โดยอัตโนมัติ
+    # แต่ละ @task คือ 1 task ใน DAG
+    # เหมือนเดิมกับตอนใช้ PythonOperator: Airflow จะดูชื่อพารามิเตอร์ในฟังก์ชัน
+    # แล้วจับคู่กับ context ของรอบนั้นให้เองอัตโนมัติ (ในที่นี้คือ logical_date)
     # -----------------------------------------------------------------------
-    extract_task = PythonOperator(
-        task_id="extract_monthly_data",
-        python_callable=extract_monthly_data,
-    )
 
-    # ตอนนี้มี task เดียว จึงยังไม่ต้องกำหนดลำดับด้วย >>
-    # พอมี transform_task, load_task เพิ่มทีหลัง จะมาต่อแบบนี้:
-    #   extract_task >> transform_task >> load_task
-    extract_task
+    @task
+    def extract(logical_date=None):
+        extract_monthly_data(logical_date=logical_date)
+
+    @task
+    def transform(logical_date=None):
+        transform_monthly_data(logical_date=logical_date)
+
+    @task
+    def load(logical_date=None):
+        load_monthly_data(logical_date=logical_date)
+
+    # -----------------------------------------------------------------------
+    # กำหนดลำดับการรัน: extract ต้องเสร็จก่อน transform ถึงจะเริ่มได้
+    # และ transform ต้องเสร็จก่อน load ถึงจะเริ่มได้ (รันเรียงกันตามลำดับ ไม่ใช่พร้อมกัน)
+    # การเรียก extract(), transform(), load() คือการสร้าง task instance ของแต่ละตัว
+    # ส่วน >> คือการบอกลำดับก่อน-หลัง อ่านว่า "แล้วต่อด้วย"
+    # -----------------------------------------------------------------------
+    extract() >> transform() >> load()
+
+
+# เรียกฟังก์ชันที่มี @dag ครอบไว้ 1 ครั้ง เพื่อให้ Airflow "จดทะเบียน" DAG นี้เข้าระบบจริงๆ
+# (ถ้าลืมเรียกบรรทัดนี้ Airflow จะไม่เห็น DAG เลย แม้โค้ดข้างบนจะถูกต้องหมดก็ตาม)
+netflix_monthly_etl()
