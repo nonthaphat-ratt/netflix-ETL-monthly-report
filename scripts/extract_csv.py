@@ -64,8 +64,12 @@ def extract_monthly_data(
     month_mask = (parsed_dates.dt.year == target_year) & (parsed_dates.dt.month == target_month)
     monthly_df = df[month_mask]
 
-    # เตรียมโฟลเดอร์ปลายทาง (สร้างอัตโนมัติถ้ายังไม่มี ไม่ error ถ้ามีอยู่แล้ว)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # เช็คว่าโฟลเดอร์ปลายทางมีอยู่จริงหรือไม่ — ไม่สร้างให้อัตโนมัติ
+    # ตั้งใจให้ error ทันทีถ้ายังไม่มีโฟลเดอร์ เพื่อบังคับให้ผู้ใช้สร้างโครงสร้างโฟลเดอร์เองก่อนรันเสมอ
+    if not output_dir.is_dir():
+        raise FileNotFoundError(
+            f"ไม่พบโฟลเดอร์ปลายทาง: {output_dir} — กรุณาสร้างโฟลเดอร์นี้ก่อนรัน script"
+        )
 
     # ตั้งชื่อไฟล์ตามปี-เดือนของรอบนี้ เช่น 2008-01.csv
     output_filename = f"{target_year:04d}-{target_month:02d}.csv"
