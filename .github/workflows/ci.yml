@@ -1,0 +1,33 @@
+# .github/workflows/ci.yml
+#
+# หน้าที่: รัน test อัตโนมัติทุกครั้งที่ push หรือเปิด pull request เข้า branch main
+# เช็คแค่ว่า dags/pipeline_dag.py "parse ผ่านไม่ error" (ดู tests/test_dag_integrity.py)
+# ยังไม่ได้ทดสอบ logic ของ extract/transform/load แบบละเอียด (เป็น step ต่อยอดในอนาคต)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ดึงโค้ดจาก repo
+        uses: actions/checkout@v4
+
+      - name: ติดตั้ง Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ขั้นตอนนี้จะใช้เวลาสักครู่ (1-3 นาที) เพราะ apache-airflow มี dependency เยอะ ถือเป็นเรื่องปกติ
+      - name: ติดตั้ง library ตาม requirements.txt
+        run: pip install -r requirements.txt
+
+      - name: รัน test เช็คว่า DAG พังหรือไม่
+        run: pytest tests/ -v
