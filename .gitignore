@@ -1,0 +1,26 @@
+# --- Secret / config เฉพาะเครื่อง ---
+# ห้าม commit ไฟล์นี้เด็ดขาด มี FERNET_KEY และ password อยู่ข้างใน
+.env
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+.conda/
+
+# --- ผลลัพธ์ที่ script สร้างเอง (สร้างซ้ำได้จาก netflix_titles.csv เสมอ ไม่จำเป็นต้องเก็บใน git) ---
+data/extracted/*
+data/transformed/*
+data/genres/*
+!data/extracted/.gitkeep
+!data/transformed/.gitkeep
+!data/genres/.gitkeep
+*.duckdb
+
+# --- ไฟล์ที่ Airflow/Docker สร้างเองตอนรัน container ---
+logs/*
+!logs/.gitkeep
+plugins/*
+!plugins/.gitkeep
+config/*
+!config/.gitkeep
