@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 .venv/
 .conda/
+.vscode/
 
 # --- ผลลัพธ์ที่ script สร้างเอง (สร้างซ้ำได้จาก netflix_titles.csv เสมอ ไม่จำเป็นต้องเก็บใน git) ---
 data/extracted/*
