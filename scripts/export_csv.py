@@ -1,5 +1,5 @@
 """
-export_for_powerbi.py
+export_csv.py
 
 หน้าที่: export ข้อมูลจาก data/netflix.duckdb ออกมาเป็นไฟล์ CSV
          สำหรับให้ Power BI import ไปทำ dashboard แบบ static (ไม่ใช่ live connection)
