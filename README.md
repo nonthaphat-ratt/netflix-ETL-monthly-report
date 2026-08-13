@@ -2,7 +2,9 @@
 
 # 🎬 Netflix Monthly ETL Pipeline
 
-**A production-style batch ETL pipeline** that simulates monthly data ingestion for Netflix's content catalog — built end-to-end from a single static CSV file.
+**A production-style batch ETL pipeline** that simulates monthly data ingestion for Netflix's content catalog 
+
+— built end-to-end from a single static CSV file.
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-1.5.5-FFF000)
